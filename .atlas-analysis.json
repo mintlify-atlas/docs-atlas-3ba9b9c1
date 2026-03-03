@@ -1,0 +1,60 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Laravel Active Email",
+  "projectDescription": "A Laravel package providing validation rules to block disposable email addresses",
+  "theme": "linden",
+  "primaryColor": "#FF2D20",
+  "lightColor": "#FFF5F7",
+  "darkColor": "#18181B",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": [
+          "introduction",
+          "installation",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/usage",
+          "guides/configuration",
+          "guides/customization"
+        ]
+      },
+      {
+        "group": "API Reference",
+        "pages": [
+          "api/validation-rule",
+          "api/disposable-email",
+          "api/facade"
+        ]
+      },
+      {
+        "group": "Resources",
+        "pages": [
+          "resources/faq",
+          "resources/changelog",
+          "resources/contributing"
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Validates against thousands of disposable email domains",
+    "Customizable blacklist, greylist, and whitelist",
+    "Strict mode for enhanced protection",
+    "Case-aware and wildcard-aware validation",
+    "Easy Laravel integration with validation rules"
+  ],
+  "publicApiSurface": [
+    "NotBlacklistedEmail (Validation Rule Class)",
+    "notblacklisted (Validation Rule String)",
+    "DisposableEmail::getBlacklist()",
+    "DisposableEmail::getGreyList()",
+    "ActiveEmail (Facade)",
+    "ActiveEmailProvider (Service Provider)"
+  ]
+}
