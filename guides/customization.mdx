@@ -1,0 +1,517 @@
+---
+title: 'Customization'
+description: 'Customize blacklists, whitelists, strict mode, and error messages for Laravel Active Email'
+---
+
+## Overview
+
+Laravel Active Email is highly customizable, allowing you to tailor email validation to your specific needs. You can add custom domains to the blacklist, create a whitelist for development, control strict mode behavior, and customize error messages.
+
+## Adding Domains to the Blacklist
+
+The blacklist contains domains that are always blocked, regardless of the strict mode setting.
+
+### Basic Blacklist Configuration
+
+Add domains to the `blacklist` array in your `config/active-email.php` file:
+
+```php config/active-email.php
+return [
+    'blacklist' => [
+        'tempmail',
+        'guerrillamail',
+        'throwaway',
+        'mailinator',
+        '10minutemail',
+        'trashmail',
+    ],
+    // ... other config options
+];
+```
+
+<Note>
+You can specify domains with or without the TLD (top-level domain). The validator will match the base domain name, so `tempmail` will block `tempmail.com`, `tempmail.net`, etc.
+</Note>
+
+### Use Cases for Custom Blacklists
+
+<Accordion title="Block Competitor Domains">
+  Prevent users from signing up with email addresses from competitor companies:
+
+  ```php
+  'blacklist' => [
+      'competitor',
+      'rival-company',
+  ]
+  ```
+</Accordion>
+
+<Accordion title="Block Known Spam Sources">
+  Add domains that you've identified as sources of spam or abuse:
+
+  ```php
+  'blacklist' => [
+      'spamhaus',
+      'known-spammer',
+      'abuse-source',
+  ]
+  ```
+</Accordion>
+
+<Accordion title="Block Personal Email for B2B">
+  For B2B applications, you might want to require business emails:
+
+  ```php
+  'blacklist' => [
+      'gmail',
+      'yahoo',
+      'hotmail',
+      'outlook',
+  ]
+  ```
+
+  <Warning>
+  Be careful with this approach as many legitimate users use personal email addresses. Consider using the greylist instead.
+  </Warning>
+</Accordion>
+
+### How Blacklist Merging Works
+
+Your custom blacklist is merged with the package's built-in list:
+
+```php src/Rules/NotBlacklistedEmail.php
+$blackListedDomainNames = array_unique(
+    array_merge(
+        config('active-email.blacklist'),      // Your custom list
+        $disposableEmail->getBlacklist()       // Built-in list
+    )
+);
+```
+
+This means you don't need to maintain the full list of disposable domains - just add your specific additions.
+
+## Adding Domains to the Greylist
+
+The greylist contains domains that are only blocked when strict mode is enabled. This is useful for domains that aren't disposable but may be undesirable in certain contexts.
+
+### Basic Greylist Configuration
+
+```php config/active-email.php
+return [
+    'greylist' => [
+        'protonmail',
+        'tutanota',
+        'cock.li',
+    ],
+    // ... other config options
+];
+```
+
+### When to Use the Greylist
+
+<CardGroup cols={2}>
+
+<Card title="Privacy-Focused Services" icon="shield">
+  Privacy-focused email services that might be used to hide identity:
+
+  ```php
+  'greylist' => [
+      'protonmail',
+      'tutanota',
+      'mailbox.org',
+  ]
+  ```
+</Card>
+
+<Card title="Alias Services" icon="user-secret">
+  Email alias and forwarding services:
+
+  ```php
+  'greylist' => [
+      'simplelogin',
+      'anonaddy',
+      'duck.com',
+  ]
+  ```
+</Card>
+
+</CardGroup>
+
+<Warning>
+Ensure domains in the greylist are not already in the blacklist, as blacklisted domains are always blocked regardless of strict mode.
+</Warning>
+
+## Using the Whitelist
+
+The whitelist allows specific domains to bypass all blacklist and greylist restrictions. This is particularly useful for development and testing environments.
+
+### Development Whitelisting
+
+Allow test email addresses in your development environment:
+
+```php config/active-email.php
+return [
+    'whitelist' => [
+        'mailinator.com',     // For integration testing
+        'example.com',        // For unit tests
+        'test.local',         // Local development
+        'mailtrap.io',        // Email testing service
+    ],
+    // ... other config options
+];
+```
+
+### Environment-Specific Whitelisting
+
+Use environment variables to conditionally whitelist domains:
+
+```php config/active-email.php
+return [
+    'whitelist' => env('APP_ENV') === 'local' ? [
+        'mailinator.com',
+        'guerrillamail.com',
+        'test.local',
+    ] : [],
+    // ... other config options
+];
+```
+
+### Whitelist Priority
+
+The whitelist is checked first, before any blacklist validation:
+
+```php src/Rules/NotBlacklistedEmail.php
+$whiteListedDomainNames = array_unique(config('active-email.whitelist'));
+
+foreach ($whiteListedDomainNames as $whiteListedDomainName) {
+    $byePass = $this->getDomainName('.', $whiteListedDomainName, 0);
+
+    if ($domainName === $byePass) {
+        return;  // Validation passes immediately
+    }
+}
+```
+
+This means whitelisted domains will always pass validation, even if they appear in the blacklist or greylist.
+
+## Strict Mode Configuration
+
+Strict mode controls whether greylist domains are blocked.
+
+### Setting Strict Mode
+
+<Tabs>
+  <Tab title="Configuration File">
+    Set directly in `config/active-email.php`:
+
+    ```php
+    return [
+        'strict_mode' => true,
+        // ... other config options
+    ];
+    ```
+  </Tab>
+
+  <Tab title="Environment Variable">
+    Control via `.env` file:
+
+    ```bash .env
+    DISPOSABLE_EMAIL_STRICT_MODE=true
+    ```
+
+    Then reference it in the config:
+
+    ```php
+    return [
+        'strict_mode' => env('DISPOSABLE_EMAIL_STRICT_MODE', true),
+        // ... other config options
+    ];
+    ```
+  </Tab>
+</Tabs>
+
+### Strict Mode Behavior
+
+<Steps>
+
+<Step title="Strict Mode Enabled (Default)">
+  When strict mode is `true`:
+
+  - Blacklist domains are blocked ✓
+  - Greylist domains are blocked ✓
+  - Only whitelisted domains can bypass
+
+  ```php
+  // In the validation rule
+  if (config('active-email.strict_mode')) {
+      $blackListedDomainNames = array_merge(
+          $blackListedDomainNames,
+          $greyListedDomainNames
+      );
+  }
+  ```
+
+  **Use case**: Production environments where maximum protection is needed.
+</Step>
+
+<Step title="Strict Mode Disabled">
+  When strict mode is `false`:
+
+  - Blacklist domains are blocked ✓
+  - Greylist domains are allowed ✓
+  - Whitelisted domains still bypass
+
+  **Use case**: Development environments or when you want to allow privacy-focused email services.
+</Step>
+
+</Steps>
+
+### Environment-Based Strict Mode
+
+Configure different strict mode settings per environment:
+
+<CodeGroup>
+
+```bash .env (Production)
+APP_ENV=production
+DISPOSABLE_EMAIL_STRICT_MODE=true
+```
+
+```bash .env.local (Development)
+APP_ENV=local
+DISPOSABLE_EMAIL_STRICT_MODE=false
+```
+
+```bash .env.testing (Testing)
+APP_ENV=testing
+DISPOSABLE_EMAIL_STRICT_MODE=false
+```
+
+</CodeGroup>
+
+## Custom Error Messages
+
+Customize the validation error message shown to users when their email domain is rejected.
+
+### Setting a Custom Message
+
+```php config/active-email.php
+return [
+    'error_message' => 'Please use a permanent email address from a trusted provider.',
+    // ... other config options
+];
+```
+
+### Context-Specific Messages
+
+<Accordion title="Professional/Business Context">
+  ```php
+  'error_message' => 'Please use your company or business email address to register.'
+  ```
+</Accordion>
+
+<Accordion title="Friendly/Casual Context">
+  ```php
+  'error_message' => 'Oops! We don\'t accept temporary email addresses. Please use your regular email.'
+  ```
+</Accordion>
+
+<Accordion title="Multilingual Support">
+  Use Laravel's translation features:
+
+  ```php
+  'error_message' => __('validation.active_email')
+  ```
+
+  Then in `resources/lang/en/validation.php`:
+
+  ```php
+  return [
+      'active_email' => 'Please use a permanent email address.',
+      // ... other validation messages
+  ];
+  ```
+</Accordion>
+
+### Default Message Behavior
+
+If you leave the `error_message` empty, the package uses its default:
+
+```php src/Rules/NotBlacklistedEmail.php
+$failMessage = config('active-email.error_message');
+$fail($failMessage ? $failMessage : 
+    'Sorry, your email provider is not supported. If you think this is an error, please contact us.'
+);
+```
+
+## Complete Customization Examples
+
+### Example 1: SaaS Application
+
+```php config/active-email.php
+return [
+    'strict_mode' => env('DISPOSABLE_EMAIL_STRICT_MODE', true),
+
+    'blacklist' => [
+        'tempmail',
+        'guerrillamail',
+        'throwaway',
+        '10minutemail',
+    ],
+
+    'greylist' => [
+        // Block privacy services in strict mode
+        'protonmail',
+        'tutanota',
+    ],
+
+    'whitelist' => env('APP_ENV') === 'local' ? [
+        'mailinator.com',
+        'test.local',
+    ] : [],
+
+    'error_message' => 'Please use a permanent email address. Temporary email services are not supported.',
+];
+```
+
+### Example 2: Enterprise B2B Platform
+
+```php config/active-email.php
+return [
+    'strict_mode' => true,
+
+    'blacklist' => [
+        // Block all personal email providers
+        'gmail',
+        'yahoo',
+        'hotmail',
+        'outlook',
+        // Block disposable email
+        'tempmail',
+        'guerrillamail',
+        'mailinator',
+    ],
+
+    'greylist' => [
+        // Block privacy-focused services
+        'protonmail',
+        'tutanota',
+    ],
+
+    'whitelist' => [],
+
+    'error_message' => 'Please use your corporate email address to register for our enterprise platform.',
+];
+```
+
+### Example 3: Community Platform
+
+```php config/active-email.php
+return [
+    'strict_mode' => false,  // Allow privacy-focused services
+
+    'blacklist' => [
+        // Only block obvious disposable emails
+        'tempmail',
+        'guerrillamail',
+        'throwaway',
+        'trashmail',
+    ],
+
+    'greylist' => [],  // Don't restrict privacy services
+
+    'whitelist' => [],
+
+    'error_message' => 'Temporary email addresses cannot be used. Please provide a valid email address.',
+];
+```
+
+### Example 4: Development Environment
+
+```php config/active-email.php
+return [
+    'strict_mode' => false,
+
+    'blacklist' => [],  // No custom blocks
+
+    'greylist' => [],
+
+    'whitelist' => [
+        // Allow all testing services
+        'mailinator.com',
+        'guerrillamail.com',
+        'example.com',
+        'test.local',
+        'mailtrap.io',
+        'ethereal.email',
+    ],
+
+    'error_message' => '',  // Use default message
+];
+```
+
+## Testing Your Configuration
+
+After customizing your configuration, test it with various email addresses:
+
+```php
+use Illuminate\Support\Facades\Validator;
+use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+
+// Test blacklisted domain
+$validator = Validator::make(
+    ['email' => 'test@tempmail.com'],
+    ['email' => ['email', new NotBlacklistedEmail()]]
+);
+dd($validator->fails());  // Should be true
+
+// Test whitelisted domain
+$validator = Validator::make(
+    ['email' => 'test@example.com'],
+    ['email' => ['email', new NotBlacklistedEmail()]]
+);
+dd($validator->fails());  // Should be false if whitelisted
+
+// Test greylist with strict mode
+$validator = Validator::make(
+    ['email' => 'test@protonmail.com'],
+    ['email' => ['email', new NotBlacklistedEmail()]]
+);
+dd($validator->fails());  // Depends on strict_mode setting
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+
+<Card title="Start Conservative" icon="shield-check">
+  Begin with strict mode enabled and a minimal custom blacklist. Add domains as needed based on actual abuse patterns.
+</Card>
+
+<Card title="Whitelist for Development" icon="code">
+  Always whitelist test email domains in development environments to avoid blocking legitimate testing.
+</Card>
+
+<Card title="Monitor and Adjust" icon="chart-line">
+  Track validation failures and adjust your lists based on false positives and actual abuse patterns.
+</Card>
+
+<Card title="Clear Error Messages" icon="message">
+  Provide helpful error messages that guide users on what to do if their email is rejected.
+</Card>
+
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Usage Examples" icon="code" href="/guides/usage">
+  See practical examples of using the validator
+</Card>
+
+<Card title="Configuration Reference" icon="gear" href="/guides/configuration">
+  Complete reference of all configuration options
+</Card>
+
+</CardGroup>

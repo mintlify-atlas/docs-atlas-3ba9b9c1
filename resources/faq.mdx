@@ -1,0 +1,143 @@
+---
+title: 'Frequently Asked Questions'
+description: 'Common questions about Laravel Active Email validation'
+icon: 'circle-question'
+---
+
+<Accordion title="What are disposable email addresses?">
+Disposable email addresses are temporary email addresses that users can create quickly from services like Mailinator, Guerillamail, or Tempmail. These addresses are often used to bypass registration requirements or avoid receiving ongoing communications. They typically expire after a short period or can be discarded at will.
+
+The Laravel Active Email package helps you identify and block these disposable email domains, including all their possible wildcards, to ensure users provide legitimate, long-term email addresses.
+</Accordion>
+
+<Accordion title="Why should I block disposable email addresses?">
+There are several important reasons to block disposable emails:
+
+- **Data Quality**: Ensure your user database contains valid, reachable email addresses
+- **Communication**: Maintain the ability to contact users for important notifications, password resets, and updates
+- **Prevent Abuse**: Stop users from creating multiple accounts to exploit promotions or circumvent bans
+- **Reduce Spam**: Minimize fake registrations and bot activity
+- **Business Value**: Build a genuine user base for marketing and customer engagement
+
+By validating against disposable email services, you maintain the integrity of your application's user data.
+</Accordion>
+
+<Accordion title="What is the performance impact of this validation?">
+The performance impact is minimal. The package:
+
+- Uses an in-memory list of disposable domains for fast lookups
+- Performs simple domain matching without external API calls
+- Processes validation synchronously as part of Laravel's validation pipeline
+- Is case-aware and wildcard-aware for efficient matching
+
+The validation check typically adds only a few milliseconds to your form validation process, which is negligible compared to other validation rules and database operations.
+</Accordion>
+
+<Accordion title="How often is the disposable domains list updated?">
+The package includes a curated list of disposable email domains that is maintained by the package maintainers. The list is updated with new package releases.
+
+<Note>
+You can supplement the built-in list by adding your own domains to the `blacklist` array in the `config/active-email.php` configuration file. This allows you to block specific domains relevant to your application without waiting for package updates.
+</Note>
+</Accordion>
+
+<Accordion title="Can I whitelist specific domains?">
+Yes! The package provides a flexible whitelisting system in the configuration file:
+
+```php config/active-email.php
+'whitelist' => [
+    'example.com',
+    'trusted-domain.org',
+],
+```
+
+Domains in the whitelist will bypass the blacklist validation. This is particularly useful in development environments where you might want to use test email services, or if you need to allow specific domains that are incorrectly flagged as disposable.
+
+You can specify domains with or without the TLD (top-level domain).
+</Accordion>
+
+<Accordion title="What happens when strict mode is enabled?">
+Strict mode controls the strictness level of the validation:
+
+**When strict mode is `true` (default)**:
+- Domains in the blacklist are rejected
+- Domains in the greylist are also rejected
+- Only whitelisted domains bypass validation
+
+**When strict mode is `false`**:
+- Domains in the blacklist are rejected
+- Domains in the greylist are allowed
+- Whitelisted domains bypass validation
+
+The greylist contains domains that aren't necessarily disposable but have been classified as potentially problematic. Strict mode gives you finer control over what level of email validation your application requires.
+
+Set strict mode in your `.env` file:
+```bash
+DISPOSABLE_EMAIL_STRICT_MODE=true
+```
+
+Or in the config file:
+```php
+'strict_mode' => true,
+```
+</Accordion>
+
+<Accordion title="How do I test the validation?">
+There are several ways to test the disposable email validation:
+
+**1. Run the package tests:**
+```bash
+vendor/bin/pest
+```
+
+**2. Test in your application:**
+Create a test form with email validation that includes the `notblacklisted` rule:
+
+```php
+$request->validate([
+    'email' => ['required', 'email', 'notblacklisted'],
+]);
+```
+
+**3. Test with known disposable domains:**
+Try submitting emails from services like:
+- `test@mailinator.com`
+- `test@guerrillamail.com`
+- `test@10minutemail.com`
+
+These should be rejected by the validator.
+
+**4. Use the whitelist for testing:**
+During development, add test domains to your whitelist:
+
+```php
+'whitelist' => [
+    'mailinator.com', // For testing only
+],
+```
+
+<Warning>
+Remember to remove test domains from the whitelist before deploying to production!
+</Warning>
+</Accordion>
+
+<Accordion title="Can I customize the validation error message?">
+Yes! You can customize the error message that users see when validation fails.
+
+In your `config/active-email.php` file:
+
+```php
+'error_message' => 'Please use a permanent email address, not a disposable one.',
+```
+
+If you leave this empty, the package will use its default error message. You can also use Laravel's standard validation language files to customize messages per locale.
+</Accordion>
+
+<Accordion title="Does the package work with Laravel 10 and above?">
+Yes! The package supports:
+
+- **PHP**: 8.1 and above
+- **Laravel**: 10.x, 11.x, and 12.x
+
+The service provider is automatically discovered, so no manual registration is required. Simply install via Composer and publish the configuration file to get started.
+</Accordion>

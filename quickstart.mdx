@@ -1,80 +1,208 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get up and running with Laravel Active Email in minutes
 ---
 
-## Get started in three steps
+This guide will walk you through adding disposable email validation to your Laravel application. You'll have working email validation in just a few steps.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, make sure you have:
+- Installed the package via Composer (see [Installation](/installation))
+- Published the configuration file (optional, but recommended)
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## Add validation to your forms
 
-### Step 2: Deploy your changes
+Laravel Active Email provides two ways to validate emails. Choose the approach that fits your coding style.
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+<Tabs>
+  <Tab title="Validator string">
+    Add `notblacklisted` to your validation rules:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    ```php
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|notblacklisted',
+            'password' => 'required|min:8',
+        ]);
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+        // Create user account
+        $user = User::create($validated);
 
-### Step 3: Go live
+        return redirect()->route('dashboard');
+    }
+    ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    <Info>The `notblacklisted` validator is automatically registered by the service provider.</Info>
+  </Tab>
+
+  <Tab title="Validation rule class">
+    Import and use the `NotBlacklistedEmail` class:
+
+    ```php
+    use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => ['required', 'email', new NotBlacklistedEmail()],
+            'password' => 'required|min:8',
+        ]);
+
+        // Create user account
+        $user = User::create($validated);
+
+        return redirect()->route('dashboard');
+    }
+    ```
+
+    <Tip>The class approach provides better IDE autocomplete and type safety.</Tip>
+  </Tab>
+</Tabs>
+
+## Test the validation
+
+Let's verify that disposable emails are being blocked:
+
+<Steps>
+  <Step title="Try a disposable email">
+    Submit your form with a known disposable email address like `test@mailinator.com` or `user@tempmail.com`. The validation should fail with an error message.
+
+    ```php
+    // Example test
+    $response = $this->post('/register', [
+        'name' => 'Test User',
+        'email' => 'test@mailinator.com',
+        'password' => 'password123',
+    ]);
+
+    $response->assertSessionHasErrors('email');
+    ```
+  </Step>
+
+  <Step title="Try a legitimate email">
+    Submit your form with a real email provider like `user@gmail.com`. The validation should pass.
+
+    ```php
+    // Example test
+    $response = $this->post('/register', [
+        'name' => 'Test User',
+        'email' => 'user@gmail.com',
+        'password' => 'password123',
+    ]);
+
+    $response->assertSessionHasNoErrors();
+    ```
+  </Step>
+
+  <Step title="Customize error message (optional)">
+    If you want a custom error message, update your config file:
+
+    ```php config/active-email.php
+    return [
+        'error_message' => 'Please use a permanent email address.',
+        // ... other config
+    ];
+    ```
+  </Step>
+</Steps>
+
+## Use in form requests
+
+For cleaner controllers, use Form Requests:
+
+<Steps>
+  <Step title="Create a form request">
+    ```bash
+    php artisan make:request RegisterRequest
+    ```
+  </Step>
+
+  <Step title="Add validation rules">
+    ```php app/Http/Requests/RegisterRequest.php
+    <?php
+
+    namespace App\Http\Requests;
+
+    use Illuminate\Foundation\Http\FormRequest;
+    use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+
+    class RegisterRequest extends FormRequest
+    {
+        public function authorize(): bool
+        {
+            return true;
+        }
+
+        public function rules(): array
+        {
+            return [
+                'name' => 'required|string|max:255',
+                'email' => ['required', 'email', new NotBlacklistedEmail()],
+                'password' => 'required|min:8|confirmed',
+            ];
+        }
+
+        public function messages(): array
+        {
+            return [
+                'email.notblacklisted' => 'Please use a permanent email address.',
+            ];
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Use in controller">
+    ```php
+    use App\Http\Requests\RegisterRequest;
+
+    public function store(RegisterRequest $request)
+    {
+        // Validation already happened
+        $validated = $request->validated();
+
+        $user = User::create($validated);
+
+        return redirect()->route('dashboard');
+    }
+    ```
+  </Step>
+</Steps>
+
+## Common use cases
+
+<CardGroup cols={2}>
+  <Card title="User registration" icon="user-plus" href="/guides/usage#user-registration-form">
+    Block fake accounts during sign-up
+  </Card>
+  <Card title="Newsletter subscriptions" icon="envelope" href="/guides/usage#newsletter-subscription">
+    Ensure quality email subscribers
+  </Card>
+  <Card title="Contact forms" icon="message" href="/guides/usage#contact-form-validation">
+    Prevent spam submissions
+  </Card>
+  <Card title="API validation" icon="code" href="/guides/usage#api-validation-example">
+    Validate emails in API endpoints
+  </Card>
+</CardGroup>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Learn about all configuration options
+  </Card>
+  <Card title="Strict mode" icon="shield" href="/guides/customization#strict-mode-configuration">
+    Enable stricter validation rules
+  </Card>
+  <Card title="Custom lists" icon="list" href="/guides/customization">
+    Add your own blacklist/whitelist domains
+  </Card>
+  <Card title="API reference" icon="book" href="/api/validation-rule">
+    Explore the complete API
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

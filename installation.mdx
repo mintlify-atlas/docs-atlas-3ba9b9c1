@@ -1,0 +1,163 @@
+---
+title: Installation
+description: Install Laravel Active Email in your Laravel application
+---
+
+## Requirements
+
+Before installing Laravel Active Email, ensure your environment meets these minimum requirements:
+
+- **PHP:** 8.1 or higher
+- **Laravel:** 10.x, 11.x, or 12.x
+- **Composer:** Latest version recommended
+
+<Note>
+The package supports multiple Laravel versions through flexible dependency constraints. Check your Laravel version with `php artisan --version`.
+</Note>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Install via Composer">
+    Run the following command in your Laravel project root:
+    
+    ```bash
+    composer require veeqtoh/laravel-active-email
+    ```
+    
+    Composer will download the package and its dependencies. The installation typically takes less than a minute.
+    
+    <Info>
+    Laravel's package auto-discovery will automatically register the service provider. No manual registration required!
+    </Info>
+  </Step>
+  
+  <Step title="Publish Configuration (Optional)">
+    To customize the package settings, publish the configuration file:
+    
+    ```bash
+    php artisan vendor:publish --provider="Veeqtoh\ActiveEmail\Providers\ActiveEmailProvider"
+    ```
+    
+    This creates `config/active-email.php` where you can:
+    
+    - Enable/disable strict mode
+    - Add custom blacklisted domains
+    - Configure greylist domains
+    - Whitelist specific domains
+    - Customize validation error messages
+    
+    <Tip>
+    You can skip this step and use the package with default settings. Publishing is only needed if you want to customize behavior.
+    </Tip>
+  </Step>
+  
+  <Step title="Configure Environment (Optional)">
+    Set strict mode in your `.env` file:
+    
+    ```bash
+    DISPOSABLE_EMAIL_STRICT_MODE=true
+    ```
+    
+    When set to `true` (default), the validator also blocks domains in the greylist. Set to `false` for more lenient validation.
+  </Step>
+  
+  <Step title="Clear Cache">
+    If you published the config file, clear your configuration cache:
+    
+    ```bash
+    php artisan config:clear
+    ```
+  </Step>
+</Steps>
+
+## Verify Installation
+
+To verify the package is installed correctly, check if the validation rule is available:
+
+```php
+use Illuminate\Support\Facades\Validator;
+use Veeqtoh\ActiveEmail\Rules\NotBlackListedEmail;
+
+// Method 1: String-based validator
+$validator = Validator::make(
+    ['email' => 'test@mailinator.com'],
+    ['email' => 'email|notblacklisted']
+);
+
+// Method 2: Class-based validator
+$validator = Validator::make(
+    ['email' => 'test@mailinator.com'],
+    ['email' => ['email', new NotBlackListedEmail()]]
+);
+
+if ($validator->fails()) {
+    echo "Package is working! Disposable email blocked.";
+}
+```
+
+## Configuration File Structure
+
+If you published the config file, you'll find it at `config/active-email.php`:
+
+```php
+return [
+    // Enable strict mode (also blocks greylist domains)
+    'strict_mode' => env('DISPOSABLE_EMAIL_STRICT_MODE', true),
+    
+    // Add your own blacklisted domains
+    'blacklist' => [
+        // 'example-disposable',
+    ],
+    
+    // Domains blocked only in strict mode
+    'greylist' => [
+        //
+    ],
+    
+    // Domains to bypass validation (for testing)
+    'whitelist' => [
+        //
+    ],
+    
+    // Custom error message
+    'error_message' => '',
+];
+```
+
+<Note>
+Domains can be added with or without TLD (e.g., both `'mailinator'` and `'mailinator.com'` work). The package handles wildcards automatically.
+</Note>
+
+## Updating the Package
+
+To update to the latest version:
+
+```bash
+composer update veeqtoh/laravel-active-email
+```
+
+Check the [CHANGELOG](https://github.com/veeqtoh/laravel-active-email/blob/master/CHANGELOG.md) for version-specific update notes.
+
+## Troubleshooting
+
+<Warning>
+If you encounter issues after installation:
+
+1. Run `composer dump-autoload` to refresh autoloader
+2. Clear Laravel caches: `php artisan cache:clear && php artisan config:clear`
+3. Verify PHP version meets minimum requirements
+4. Check that the service provider is loaded: `php artisan about`
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Learn how to use the validation rule
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Customize lists and error messages
+  </Card>
+</CardGroup>

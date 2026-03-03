@@ -1,0 +1,225 @@
+---
+title: "DisposableEmail Class"
+description: "Access lists of disposable and temporary email domains"
+---
+
+## Overview
+
+The `DisposableEmail` class provides access to comprehensive lists of disposable and temporary email domain names. This class contains thousands of known disposable email service domains used for validation.
+
+## Class Reference
+
+### Namespace
+
+```php
+Veeqtoh\ActiveEmail\DisposableEmail
+```
+
+## Methods
+
+### getBlacklist()
+
+```php
+public function getBlacklist(): array
+```
+
+Retrieves the list of base domains (without TLDs) that are blacklisted by default.
+
+<ResponseField name="return" type="array">
+  Returns an array of thousands of disposable email domain base names. These are domain names without their top-level domains (TLDs).
+  
+  Example domains in the list:
+  - `0-mail`
+  - `10minutemail`
+  - `guerillamail`
+  - `mailinator`
+  - `tempmail`
+  - ...and thousands more
+</ResponseField>
+
+### getGreyList()
+
+```php
+public function getGreyList(): array
+```
+
+Retrieves the list of domains that are only blacklisted when strict mode is enabled.
+
+<ResponseField name="return" type="array">
+  Returns an array of domain base names that are considered questionable but not definitively disposable. These domains are only blocked when `strict_mode` is set to `true` in the configuration.
+</ResponseField>
+
+## How Domain Lists Work
+
+### Base Domain Matching
+
+The domain lists contain **base domain names without TLDs**. This means:
+
+- List contains: `10minutemail`
+- Matches: `10minutemail.com`, `10minutemail.net`, `10minutemail.org`, etc.
+- Also matches: `subdomain.10minutemail.com`
+
+This wildcard-aware approach ensures that disposable email services can't bypass validation by using different TLDs or subdomains.
+
+### Case-Insensitive
+
+All domain matching is case-insensitive:
+
+- `TempMail.com` = `tempmail.com` = `TEMPMAIL.COM`
+
+### List Size
+
+The blacklist contains **thousands of disposable domain names**, providing comprehensive coverage of known temporary email services including:
+
+- Popular services (Mailinator, Guerrilla Mail, TempMail)
+- Lesser-known providers
+- International disposable email services
+- Newly discovered temporary email domains
+
+## Usage Examples
+
+### Basic Usage
+
+```php
+use Veeqtoh\ActiveEmail\DisposableEmail;
+
+$disposable = new DisposableEmail();
+
+// Get all blacklisted domains
+$blacklist = $disposable->getBlacklist();
+echo count($blacklist); // Outputs: 2000+ domains
+
+// Get greylist domains
+$greylist = $disposable->getGreyList();
+```
+
+### Checking if Domain is Disposable
+
+```php
+use Veeqtoh\ActiveEmail\DisposableEmail;
+
+$disposable = new DisposableEmail();
+$blacklist = $disposable->getBlacklist();
+
+$email = 'user@10minutemail.com';
+$domain = explode('@', $email)[1]; // '10minutemail.com'
+$baseDomain = explode('.', $domain)[0]; // '10minutemail'
+
+if (in_array($baseDomain, $blacklist)) {
+    echo "This is a disposable email address";
+}
+```
+
+<Note>
+  In practice, you should use the `NotBlacklistedEmail` validation rule instead of manually checking domains. The validation rule handles all the complexity of domain extraction and matching.
+</Note>
+
+### Combining with Custom Lists
+
+```php
+use Veeqtoh\ActiveEmail\DisposableEmail;
+
+$disposable = new DisposableEmail();
+
+// Merge built-in blacklist with custom domains from config
+$customBlacklist = config('active-email.blacklist', []);
+$allBlacklisted = array_unique(
+    array_merge($customBlacklist, $disposable->getBlacklist())
+);
+
+// In strict mode, include greylist
+if (config('active-email.strict_mode')) {
+    $greylist = $disposable->getGreyList();
+    $allBlacklisted = array_merge($allBlacklisted, $greylist);
+}
+```
+
+## Integration with Validation
+
+The `DisposableEmail` class is used internally by the `NotBlacklistedEmail` validation rule:
+
+```php
+// Inside NotBlacklistedEmail::validate()
+$disposableEmail = new DisposableEmail();
+
+$blackListedDomainNames = array_unique(
+    array_merge(
+        config('active-email.blacklist'),
+        $disposableEmail->getBlacklist()
+    )
+);
+
+$greyListedDomainNames = array_unique(
+    array_merge(
+        config('active-email.greylist'),
+        $disposableEmail->getGreyList()
+    )
+);
+```
+
+## Use Cases
+
+### 1. Custom Validation Logic
+
+Access the domain lists directly for custom validation scenarios:
+
+```php
+use Veeqtoh\ActiveEmail\DisposableEmail;
+
+class CustomEmailValidator
+{
+    public function validateDomain(string $email): bool
+    {
+        $disposable = new DisposableEmail();
+        $blacklist = $disposable->getBlacklist();
+        
+        // Your custom logic here
+        // ...
+        
+        return true;
+    }
+}
+```
+
+### 2. Analytics and Reporting
+
+Generate reports on disposable email usage:
+
+```php
+use Veeqtoh\ActiveEmail\DisposableEmail;
+
+$disposable = new DisposableEmail();
+$blacklist = $disposable->getBlacklist();
+
+$stats = [
+    'total_disposable_domains' => count($blacklist),
+    'total_greylist_domains' => count($disposable->getGreyList()),
+];
+```
+
+### 3. Bulk Email Validation
+
+Validate multiple email addresses at once:
+
+```php
+use Veeqtoh\ActiveEmail\DisposableEmail;
+
+$emails = ['user1@tempmail.com', 'user2@gmail.com', 'user3@10minutemail.net'];
+$disposable = new DisposableEmail();
+$blacklist = $disposable->getBlacklist();
+
+$validEmails = [];
+foreach ($emails as $email) {
+    $domain = explode('@', $email)[1];
+    $baseDomain = explode('.', $domain)[0];
+    
+    if (!in_array($baseDomain, $blacklist)) {
+        $validEmails[] = $email;
+    }
+}
+```
+
+## Related
+
+- [NotBlacklistedEmail Validation Rule](/api/validation-rule) - Uses this class for email validation
+- [Configuration](/guides/configuration) - Configure custom blacklist and greylist domains

@@ -1,0 +1,130 @@
+---
+title: Introduction
+description: Learn how Laravel Active Email protects your application from disposable email addresses
+---
+
+## What is Laravel Active Email?
+
+Laravel Active Email is a powerful validation package that protects your Laravel application from disposable, temporary, and fake email addresses. It validates email addresses against an extensive database of thousands of known disposable email domains, helping you maintain a clean user base and improve email deliverability.
+
+## Why Use Laravel Active Email?
+
+Disposable email services like Mailinator, Guerrillamail, and Tempmail are commonly used for:
+
+- Creating temporary accounts
+- Bypassing registration requirements
+- Avoiding legitimate communication
+- Fraudulent signups and spam
+
+Laravel Active Email blocks these addresses at validation time, ensuring only legitimate users can register in your application.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Extensive Domain Database" icon="database">
+    Validates against thousands of disposable email domains with regular updates
+  </Card>
+  
+  <Card title="Customizable Lists" icon="list">
+    Add your own blacklist, greylist, and whitelist domains for complete control
+  </Card>
+  
+  <Card title="Strict Mode" icon="shield">
+    Toggle between lenient and strict validation with greylist enforcement
+  </Card>
+  
+  <Card title="Case & Wildcard Aware" icon="wand-magic-sparkles">
+    Handles domain variations, wildcards, and case sensitivity automatically
+  </Card>
+  
+  <Card title="Easy Integration" icon="plug">
+    Works seamlessly with Laravel's validation system
+  </Card>
+  
+  <Card title="Zero Configuration" icon="bolt">
+    Auto-discovery means it works out of the box
+  </Card>
+</CardGroup>
+
+## Use Cases
+
+### E-commerce Platform
+
+Prevent fraudulent orders and maintain customer communication by blocking disposable emails during checkout:
+
+```php
+public function rules()
+{
+    return [
+        'email' => ['required', 'email', 'notblacklisted'],
+        'name' => 'required',
+        'phone' => 'required',
+    ];
+}
+```
+
+### SaaS Application
+
+Ensure trial signups use legitimate emails for product updates and conversion:
+
+```php
+use Veeqtoh\ActiveEmail\Rules\NotBlackListedEmail;
+
+Validator::make($request->all(), [
+    'email' => ['required', 'email', new NotBlackListedEmail()],
+    'company' => 'required',
+]);
+```
+
+### Newsletter Subscription
+
+Maintain high deliverability rates by accepting only real email addresses:
+
+```php
+$request->validate([
+    'email' => 'required|email|notblacklisted',
+]);
+```
+
+### Contest or Giveaway
+
+Prevent multiple entries from the same person using disposable emails:
+
+```php
+public function store(Request $request)
+{
+    $validated = $request->validate([
+        'email' => ['required', 'email', 'unique:entries', 'notblacklisted'],
+        'full_name' => 'required',
+    ]);
+    
+    Entry::create($validated);
+}
+```
+
+## How It Works
+
+The package extracts the domain from any submitted email address and checks it against:
+
+1. **Your custom whitelist** - Always allowed (useful for development)
+2. **Built-in blacklist** - Thousands of known disposable domains
+3. **Your custom blacklist** - Additional domains you want to block
+4. **Greylist** - Questionable domains (blocked only in strict mode)
+
+If the domain matches any blacklisted domain (and isn't whitelisted), validation fails with a customizable error message.
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install the package via Composer
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running in minutes
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Customize lists and error messages
+  </Card>
+</CardGroup>

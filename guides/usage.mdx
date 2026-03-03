@@ -1,0 +1,282 @@
+---
+title: 'Usage'
+description: 'Learn how to use Laravel Active Email to validate email addresses in your application'
+---
+
+## Overview
+
+Laravel Active Email provides two approaches to validate email addresses and prevent disposable or blacklisted email domains from being used in your application. You can use either the validator string approach or the validation rule class approach.
+
+## Validator String Approach
+
+The simplest way to use the package is to add the `notblacklisted` validator to your validation rules. This approach works seamlessly with Laravel's built-in validation.
+
+<Note>
+It's recommended to add the `notblacklisted` rule after the `email` validator to ensure a valid email format is checked first.
+</Note>
+
+### Basic Example
+
+<CodeGroup>
+
+```php Array Syntax
+$request->validate([
+    'email' => ['email', 'notblacklisted'],
+]);
+```
+
+```php String Syntax
+$request->validate([
+    'email' => 'email|notblacklisted',
+]);
+```
+
+</CodeGroup>
+
+### User Registration Form
+
+Here's a complete example of using the validator in a user registration controller:
+
+```php
+use Illuminate\Http\Request;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+
+public function register(Request $request)
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|notblacklisted|unique:users',
+        'password' => 'required|string|min:8|confirmed',
+    ]);
+
+    $user = User::create([
+        'name' => $validated['name'],
+        'email' => $validated['email'],
+        'password' => Hash::make($validated['password']),
+    ]);
+
+    return response()->json([
+        'message' => 'Registration successful',
+        'user' => $user,
+    ]);
+}
+```
+
+### Contact Form Validation
+
+You can also use it in contact forms to prevent spam from disposable email addresses:
+
+```php
+public function submitContact(Request $request)
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|notblacklisted',
+        'subject' => 'required|string|max:255',
+        'message' => 'required|string|max:1000',
+    ]);
+
+    // Process the contact form submission
+    // Send email, store in database, etc.
+
+    return back()->with('success', 'Thank you for contacting us!');
+}
+```
+
+## Validation Rule Class Approach
+
+For more control and better IDE support, you can use the `NotBlacklistedEmail` validation rule class directly.
+
+### Basic Example
+
+```php
+use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+
+$request->validate([
+    'email' => ['email', new NotBlacklistedEmail()],
+]);
+```
+
+### Newsletter Subscription
+
+```php
+use Illuminate\Http\Request;
+use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+use App\Models\Subscriber;
+
+public function subscribe(Request $request)
+{
+    $validated = $request->validate([
+        'email' => [
+            'required',
+            'email',
+            new NotBlacklistedEmail(),
+            'unique:subscribers',
+        ],
+    ]);
+
+    $subscriber = Subscriber::create([
+        'email' => $validated['email'],
+        'subscribed_at' => now(),
+    ]);
+
+    return response()->json([
+        'message' => 'Successfully subscribed to our newsletter!',
+    ]);
+}
+```
+
+### Multiple Email Fields
+
+When validating multiple email fields in the same request:
+
+```php
+use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+
+$request->validate([
+    'primary_email' => ['required', 'email', new NotBlacklistedEmail()],
+    'secondary_email' => ['nullable', 'email', new NotBlacklistedEmail()],
+    'billing_email' => ['required', 'email', new NotBlacklistedEmail()],
+]);
+```
+
+## Form Request Validation
+
+You can also use the validation rule in Laravel Form Requests:
+
+<Steps>
+
+<Step title="Create a Form Request">
+
+Generate a new form request class:
+
+```bash
+php artisan make:request StoreUserRequest
+```
+
+</Step>
+
+<Step title="Add Validation Rules">
+
+Add the validation rules to your form request:
+
+```php
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+
+class StoreUserRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'name' => 'required|string|max:255',
+            'email' => ['required', 'email', new NotBlacklistedEmail(), 'unique:users'],
+            'password' => 'required|string|min:8|confirmed',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'email.notblacklisted' => 'Please use a permanent email address.',
+        ];
+    }
+}
+```
+
+</Step>
+
+<Step title="Use in Controller">
+
+Type-hint the form request in your controller method:
+
+```php
+use App\Http\Requests\StoreUserRequest;
+
+public function store(StoreUserRequest $request)
+{
+    $user = User::create($request->validated());
+
+    return response()->json($user, 201);
+}
+```
+
+</Step>
+
+</Steps>
+
+## Validation Behavior
+
+The validation rule checks the email domain against several lists:
+
+1. **Whitelist Check**: If the domain is in the whitelist, validation passes immediately
+2. **Blacklist Check**: If the domain is in the blacklist, validation fails
+3. **Greylist Check**: If strict mode is enabled, domains in the greylist are also blocked
+4. **Case Insensitive**: All domain comparisons are case-insensitive
+
+<Warning>
+The validator extracts the base domain name from the email address, so it will catch wildcards. For example, if `tempmail` is blacklisted, emails from `tempmail.com`, `tempmail.net`, and `info@tempmail.co.uk` will all be blocked.
+</Warning>
+
+## Error Messages
+
+When validation fails, the default error message is:
+
+> "Sorry, your email provider is not supported. If you think this is an error, please contact us."
+
+You can customize this message in the configuration file. See the [Customization guide](/guides/customization) for more details.
+
+## API Validation Example
+
+For API endpoints with JSON responses:
+
+```php
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+
+public function createAccount(Request $request)
+{
+    try {
+        $validated = $request->validate([
+            'email' => ['required', 'email', new NotBlacklistedEmail()],
+            'username' => 'required|string|unique:users',
+        ]);
+
+        // Create account logic
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Account created successfully',
+        ], 201);
+
+    } catch (ValidationException $e) {
+        return response()->json([
+            'success' => false,
+            'errors' => $e->errors(),
+        ], 422);
+    }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Configuration" icon="gear" href="/guides/configuration">
+  Learn about all available configuration options
+</Card>
+
+<Card title="Customization" icon="paintbrush" href="/guides/customization">
+  Customize blacklists, whitelists, and error messages
+</Card>
+
+</CardGroup>

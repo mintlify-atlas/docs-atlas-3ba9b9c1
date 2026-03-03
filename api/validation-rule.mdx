@@ -1,0 +1,216 @@
+---
+title: "NotBlacklistedEmail Validation Rule"
+description: "Validate email addresses against disposable domain blacklists"
+---
+
+## Overview
+
+The `NotBlacklistedEmail` class is a Laravel validation rule that checks if an email address domain is not from a disposable or temporary email service. It validates against thousands of known disposable email domains.
+
+## Class Reference
+
+### Namespace
+
+```php
+Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail
+```
+
+### Implementation
+
+Implements `Illuminate\Contracts\Validation\ValidationRule`
+
+## Constructor
+
+```php
+public function __construct()
+```
+
+The constructor initializes the validation rule. No parameters are required.
+
+## Methods
+
+### validate()
+
+```php
+public function validate(string $attribute, mixed $value, Closure $fail): void
+```
+
+Runs the validation rule against the email address.
+
+<ParamField path="$attribute" type="string" required>
+  The name of the attribute being validated (e.g., "email")
+</ParamField>
+
+<ParamField path="$value" type="mixed" required>
+  The value of the attribute being validated (the email address)
+</ParamField>
+
+<ParamField path="$fail" type="Closure" required>
+  A callback function that should be invoked with an error message if validation fails
+</ParamField>
+
+<ResponseField name="return" type="void">
+  This method returns nothing. It calls the `$fail` callback if validation fails.
+</ResponseField>
+
+## Validation Logic
+
+The validation process:
+
+1. Extracts the domain from the email address
+2. Checks against the **whitelist** first - if domain is whitelisted, validation passes immediately
+3. Merges the built-in blacklist with custom blacklist from configuration
+4. In strict mode, also includes greylist domains in the blacklist
+5. Compares the email domain against blacklisted domains
+6. Fails validation if a match is found
+
+## Usage
+
+### Class Approach
+
+Use the validation rule as a class instance:
+
+```php
+use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+
+Validator::make($data, [
+    'email' => ['required', 'email', new NotBlacklistedEmail()],
+]);
+```
+
+**Form Request Example:**
+
+```php
+use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+
+public function rules(): array
+{
+    return [
+        'email' => ['required', 'email', new NotBlacklistedEmail()],
+        'name' => ['required', 'string'],
+    ];
+}
+```
+
+### String Validator Approach
+
+Use the registered string validator:
+
+```php
+Validator::make($data, [
+    'email' => 'required|email|notblacklisted',
+]);
+```
+
+**Form Request Example:**
+
+```php
+public function rules(): array
+{
+    return [
+        'email' => 'required|email|notblacklisted',
+    ];
+}
+```
+
+### Controller Example
+
+<CodeGroup>
+
+```php Class-based
+use Illuminate\Http\Request;
+use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+
+class RegistrationController extends Controller
+{
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => ['required', 'email', new NotBlacklistedEmail()],
+            'password' => 'required|min:8|confirmed',
+        ]);
+        
+        // Process registration...
+    }
+}
+```
+
+```php String-based
+use Illuminate\Http\Request;
+
+class RegistrationController extends Controller
+{
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|notblacklisted',
+            'password' => 'required|min:8|confirmed',
+        ]);
+        
+        // Process registration...
+    }
+}
+```
+
+</CodeGroup>
+
+## Error Messages
+
+### Default Error Message
+
+If validation fails, the default error message is:
+
+```
+Sorry, your email provider is not supported. If you think this is an error, please contact us.
+```
+
+### Custom Error Message
+
+You can customize the error message in the `config/active-email.php` file:
+
+```php
+return [
+    'error_message' => 'Please use a valid email address from a trusted provider.',
+    // ...
+];
+```
+
+Or set it via environment variable in your `.env` file:
+
+```env
+DISPOSABLE_EMAIL_ERROR_MESSAGE="Please use a valid email address from a trusted provider."
+```
+
+## Configuration
+
+The validation rule respects these configuration options:
+
+- `active-email.blacklist` - Custom domains to blacklist
+- `active-email.greylist` - Domains to blacklist only in strict mode
+- `active-email.whitelist` - Domains to always allow (bypasses blacklist)
+- `active-email.strict_mode` - Whether to include greylist in validation
+- `active-email.error_message` - Custom validation error message
+
+See the [Configuration](/guides/configuration) guide for details.
+
+## Documentation Method
+
+### docs()
+
+```php
+public static function docs(): array
+```
+
+Provides documentation metadata for API documentation tools like Scribe.
+
+<ResponseField name="return" type="array">
+  Returns an array with description and example:
+  ```php
+  [
+      'description' => 'The email must be from a trusted provider.',
+      'example' => 'google.com',
+  ]
+  ```
+</ResponseField>

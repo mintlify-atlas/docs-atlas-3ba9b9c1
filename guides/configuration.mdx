@@ -1,0 +1,321 @@
+---
+title: 'Configuration'
+description: 'Configure Laravel Active Email to match your application needs'
+---
+
+## Publishing Configuration
+
+After installing the package, publish the configuration file:
+
+```bash
+php artisan vendor:publish --provider="Veeqtoh\ActiveEmail\Providers\ActiveEmailProvider"
+```
+
+This will create a `config/active-email.php` file in your Laravel application.
+
+## Configuration File Structure
+
+The configuration file contains five main sections that control how email validation behaves:
+
+```php config/active-email.php
+<?php
+
+return [
+    'strict_mode' => env('DISPOSABLE_EMAIL_STRICT_MODE', true),
+    'blacklist' => [],
+    'greylist' => [],
+    'whitelist' => [],
+    'error_message' => '',
+];
+```
+
+## Configuration Options
+
+<ParamField path="strict_mode" type="boolean" default="true">
+  Determines the strictness level of email validation. When enabled, domains in the greylist are also blocked.
+
+  **Environment Variable**: `DISPOSABLE_EMAIL_STRICT_MODE`
+
+  ```php
+  'strict_mode' => env('DISPOSABLE_EMAIL_STRICT_MODE', true)
+  ```
+
+  <Accordion title="How Strict Mode Works">
+    When strict mode is enabled:
+    - All blacklisted domains are blocked
+    - All greylisted domains are also blocked
+    - Only whitelisted domains can bypass the blacklist
+
+    When strict mode is disabled:
+    - Only blacklisted domains are blocked
+    - Greylisted domains are allowed
+    - Whitelisted domains can still bypass the blacklist
+
+    This is controlled in the validation rule:
+
+    ```php src/Rules/NotBlacklistedEmail.php
+    if (config('active-email.strict_mode')) {
+        $blackListedDomainNames = array_merge(
+            $blackListedDomainNames,
+            $greyListedDomainNames
+        );
+    }
+    ```
+  </Accordion>
+</ParamField>
+
+<ParamField path="blacklist" type="array" default="[]">
+  A list of base domains (with or without TLD) that are always blocked.
+
+  ```php
+  'blacklist' => [
+      'tempmail',
+      'guerrillamail',
+      'mailinator.com',
+  ]
+  ```
+
+  <Note>
+    The package includes a built-in list of disposable domains. Your custom blacklist is merged with this built-in list.
+  </Note>
+
+  <Accordion title="Implementation Details">
+    The blacklist is merged with the package's internal disposable email list:
+
+    ```php src/Rules/NotBlacklistedEmail.php
+    $blackListedDomainNames = array_unique(
+        array_merge(
+            config('active-email.blacklist'),
+            $disposableEmail->getBlacklist()
+        )
+    );
+    ```
+  </Accordion>
+</ParamField>
+
+<ParamField path="greylist" type="array" default="[]">
+  A list of domains that are only blocked when strict mode is enabled. Useful for domains that aren't necessarily disposable but may be undesirable.
+
+  ```php
+  'greylist' => [
+      'protonmail',
+      'tutanota',
+  ]
+  ```
+
+  <Warning>
+    Ensure domains added to the greylist are not already in the blacklist, as this would make the greylist entry redundant.
+  </Warning>
+
+  <Accordion title="Implementation Details">
+    The greylist is merged with the package's internal greylist:
+
+    ```php src/Rules/NotBlacklistedEmail.php
+    $greyListedDomainNames = array_unique(
+        array_merge(
+            config('active-email.greylist'),
+            $disposableEmail->getGreyList()
+        )
+    );
+    ```
+  </Accordion>
+</ParamField>
+
+<ParamField path="whitelist" type="array" default="[]">
+  A list of domains that should bypass the blacklist. Particularly useful for development and testing environments.
+
+  ```php
+  'whitelist' => [
+      'test.local',
+      'example.com',
+  ]
+  ```
+
+  <Note>
+    Whitelisted domains are checked first and will pass validation even if they appear in the blacklist or greylist.
+  </Note>
+
+  <Accordion title="Implementation Details">
+    The whitelist check happens before any blacklist validation:
+
+    ```php src/Rules/NotBlacklistedEmail.php
+    $whiteListedDomainNames = array_unique(
+        config('active-email.whitelist')
+    );
+
+    foreach ($whiteListedDomainNames as $whiteListedDomainName) {
+        $byePass = $this->getDomainName('.', $whiteListedDomainName, 0);
+
+        if ($domainName === $byePass) {
+            return; // Validation passes immediately
+        }
+    }
+    ```
+  </Accordion>
+</ParamField>
+
+<ParamField path="error_message" type="string" default="''">
+  Custom error message displayed when validation fails. Leave empty to use the package's default message.
+
+  ```php
+  'error_message' => 'Please use a company or personal email address.'
+  ```
+
+  <Accordion title="Default Error Message">
+    If you leave this empty, the package uses this default message:
+
+    > "Sorry, your email provider is not supported. If you think this is an error, please contact us."
+
+    From the validation rule:
+
+    ```php src/Rules/NotBlacklistedEmail.php
+    $failMessage = config('active-email.error_message');
+    $fail($failMessage ? $failMessage : 
+        'Sorry, your email provider is not supported. If you think this is an error, please contact us.'
+    );
+    ```
+  </Accordion>
+</ParamField>
+
+## Environment Variables
+
+You can control the strict mode setting via your `.env` file:
+
+```bash .env
+DISPOSABLE_EMAIL_STRICT_MODE=true
+```
+
+<Tabs>
+  <Tab title="Production">
+    ```bash
+    DISPOSABLE_EMAIL_STRICT_MODE=true
+    ```
+
+    Recommended for production environments to maximize protection against disposable emails.
+  </Tab>
+
+  <Tab title="Development">
+    ```bash
+    DISPOSABLE_EMAIL_STRICT_MODE=false
+    ```
+
+    You may want to disable strict mode in development to allow more email providers during testing.
+  </Tab>
+
+  <Tab title="Testing">
+    ```bash
+    DISPOSABLE_EMAIL_STRICT_MODE=false
+    ```
+
+    Disable strict mode in your `.env.testing` file to allow test email addresses.
+  </Tab>
+</Tabs>
+
+## Configuration Examples
+
+### Basic Production Setup
+
+```php config/active-email.php
+return [
+    'strict_mode' => env('DISPOSABLE_EMAIL_STRICT_MODE', true),
+    'blacklist' => [
+        'tempmail',
+        'throwaway',
+    ],
+    'greylist' => [],
+    'whitelist' => [],
+    'error_message' => 'Please provide a valid business or personal email address.',
+];
+```
+
+### Development Setup with Whitelisting
+
+```php config/active-email.php
+return [
+    'strict_mode' => env('DISPOSABLE_EMAIL_STRICT_MODE', false),
+    'blacklist' => [],
+    'greylist' => [],
+    'whitelist' => [
+        'mailinator.com',  // Allow for testing
+        'example.com',     // Allow for testing
+        'test.local',      // Local development
+    ],
+    'error_message' => '',
+];
+```
+
+### Enterprise Setup
+
+```php config/active-email.php
+return [
+    'strict_mode' => env('DISPOSABLE_EMAIL_STRICT_MODE', true),
+    'blacklist' => [
+        'tempmail',
+        'guerrillamail',
+        'throwaway',
+        '10minutemail',
+    ],
+    'greylist' => [
+        // Personal email services to block in strict mode
+        'yahoo',
+        'hotmail',
+    ],
+    'whitelist' => [
+        // Allow specific test domains
+        'company-test.com',
+    ],
+    'error_message' => 'Please use your company email address to register.',
+];
+```
+
+## Domain Matching Behavior
+
+The package uses intelligent domain matching:
+
+<Steps>
+
+<Step title="Extract Domain">
+  The validator extracts the domain from the email address:
+
+  ```
+  user@example.com → example.com → example
+  ```
+</Step>
+
+<Step title="Extract Base Name">
+  The base domain name is extracted (before the TLD):
+
+  ```
+  example.com → example
+  tempmail.co.uk → tempmail
+  ```
+</Step>
+
+<Step title="Compare">
+  The base name is compared against each list (case-insensitive).
+</Step>
+
+</Steps>
+
+This means:
+- Adding `tempmail` to the blacklist will block `tempmail.com`, `tempmail.net`, `tempmail.org`, etc.
+- Adding `tempmail.com` will also work and has the same effect
+- Comparisons are case-insensitive: `TempMail.COM` is treated the same as `tempmail.com`
+
+<Warning>
+Be careful when blacklisting common words that might be legitimate domains. For example, blacklisting `mail` would block `gmail.com`, `mail.com`, and many other legitimate services.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Usage Examples" icon="code" href="/guides/usage">
+  See practical examples of using the validator
+</Card>
+
+<Card title="Customization" icon="paintbrush" href="/guides/customization">
+  Learn how to customize lists and behavior
+</Card>
+
+</CardGroup>

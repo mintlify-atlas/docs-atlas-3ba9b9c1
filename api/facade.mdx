@@ -1,0 +1,226 @@
+---
+title: "ActiveEmail Facade"
+description: "Laravel facade for accessing ActiveEmail functionality"
+---
+
+## Overview
+
+The `ActiveEmail` facade provides a convenient static interface for accessing the Laravel Active Email package functionality within your Laravel application.
+
+## Class Reference
+
+### Namespace
+
+```php
+Veeqtoh\ActiveEmail\Facades\ActiveEmail
+```
+
+### Extends
+
+```php
+Illuminate\Support\Facades\Facade
+```
+
+## Methods
+
+### getFacadeAccessor()
+
+```php
+protected static function getFacadeAccessor(): string
+```
+
+Returns the registered name of the component in Laravel's service container.
+
+<ResponseField name="return" type="string">
+  Returns `'active-email'` - the service container binding name for the Active Email package.
+</ResponseField>
+
+<ResponseField name="throws" type="RuntimeException">
+  May throw a `RuntimeException` if the facade accessor cannot be resolved.
+</ResponseField>
+
+## Usage
+
+### Importing the Facade
+
+```php
+use Veeqtoh\ActiveEmail\Facades\ActiveEmail;
+```
+
+### Basic Usage
+
+The facade provides static access to the underlying Active Email service:
+
+```php
+use Veeqtoh\ActiveEmail\Facades\ActiveEmail;
+
+// Access package functionality through the facade
+// Note: The facade delegates to the service container binding 'active-email'
+```
+
+## How Laravel Facades Work
+
+Facades in Laravel provide a static interface to classes that are registered in the service container. The `ActiveEmail` facade:
+
+1. Extends `Illuminate\Support\Facades\Facade`
+2. Defines `getFacadeAccessor()` to return the service container binding key
+3. Automatically resolves the bound instance when static methods are called
+4. Provides convenient static access without manual dependency injection
+
+## Service Container Binding
+
+The facade accessor `'active-email'` corresponds to the service container binding registered by the `ActiveEmailProvider`:
+
+```php
+// Registered in service container as 'active-email'
+// Accessible via: ActiveEmail::method()
+```
+
+## Example Implementation
+
+Here's how the facade resolves to the underlying service:
+
+```php
+use Veeqtoh\ActiveEmail\Facades\ActiveEmail;
+
+// When you call:
+ActiveEmail::someMethod();
+
+// Laravel:
+// 1. Calls getFacadeAccessor() which returns 'active-email'
+// 2. Resolves app('active-email') from the service container
+// 3. Calls someMethod() on the resolved instance
+```
+
+## Using the Validation Rule
+
+While the facade is available, the primary way to use the package is through the validation rule:
+
+<Tabs>
+  <Tab title="String Validator">
+    ```php
+    use Illuminate\Support\Facades\Validator;
+
+    $validator = Validator::make($data, [
+        'email' => 'required|email|notblacklisted',
+    ]);
+
+    if ($validator->fails()) {
+        // Handle validation errors
+    }
+    ```
+  </Tab>
+  <Tab title="Class-based Validation">
+    ```php
+    use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+    use Illuminate\Support\Facades\Validator;
+
+    $validator = Validator::make($data, [
+        'email' => ['required', 'email', new NotBlacklistedEmail()],
+    ]);
+
+    if ($validator->fails()) {
+        // Handle validation errors
+    }
+    ```
+  </Tab>
+  <Tab title="Form Request">
+    ```php
+    use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+    use Illuminate\Foundation\Http\FormRequest;
+
+    class RegistrationRequest extends FormRequest
+    {
+        public function rules(): array
+        {
+            return [
+                'email' => ['required', 'email', new NotBlacklistedEmail()],
+                'name' => ['required', 'string', 'max:255'],
+            ];
+        }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Service Provider Registration
+
+The facade is automatically registered through Laravel's package auto-discovery. The `ActiveEmailProvider` service provider:
+
+1. Registers the package configuration
+2. Publishes configuration files
+3. Registers the `notblacklisted` validation rule
+4. Binds services to the container
+
+```php
+// ActiveEmailProvider registers services that the facade accesses
+namespace Veeqtoh\ActiveEmail\Providers;
+
+use Illuminate\Support\ServiceProvider;
+
+class ActiveEmailProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->mergeConfigFrom(
+            __DIR__ . '/../../config/active-email.php',
+            'active-email'
+        );
+    }
+
+    public function boot(): void
+    {
+        // Publish config and register validation rules
+    }
+}
+```
+
+## Related Classes
+
+- [NotBlacklistedEmail Validation Rule](/api/validation-rule) - Main validation rule for checking disposable emails
+- [DisposableEmail Class](/api/disposable-email) - Provides access to domain blacklists
+
+## Best Practices
+
+### Use Validation Rules Directly
+
+For email validation, use the validation rule directly rather than the facade:
+
+```php
+// Recommended
+use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
+
+'email' => ['email', new NotBlacklistedEmail()]
+```
+
+### Dependency Injection
+
+When you need direct access to package functionality, use dependency injection instead of the facade:
+
+```php
+use Veeqtoh\ActiveEmail\DisposableEmail;
+
+class EmailService
+{
+    public function __construct(
+        private DisposableEmail $disposableEmail
+    ) {}
+    
+    public function getBlacklistedDomains(): array
+    {
+        return $this->disposableEmail->getBlacklist();
+    }
+}
+```
+
+### Testing
+
+When testing, facades can be mocked using Laravel's facade mocking:
+
+```php
+use Veeqtoh\ActiveEmail\Facades\ActiveEmail;
+
+ActiveEmail::shouldReceive('method')
+    ->once()
+    ->andReturn($expectedResult);
+```
