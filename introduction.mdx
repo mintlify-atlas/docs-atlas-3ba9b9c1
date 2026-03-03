@@ -68,10 +68,10 @@ public function rules()
 Ensure trial signups use legitimate emails for product updates and conversion:
 
 ```php
-use Veeqtoh\ActiveEmail\Rules\NotBlackListedEmail;
+use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
 
 Validator::make($request->all(), [
-    'email' => ['required', 'email', new NotBlackListedEmail()],
+    'email' => ['required', 'email', new NotBlacklistedEmail()],
     'company' => 'required',
 ]);
 ```
@@ -124,7 +124,7 @@ If the domain matches any blacklisted domain (and isn't whitelisted), validation
     Get up and running in minutes
   </Card>
   
-  <Card title="Configuration" icon="gear" href="/configuration">
-    Customize lists and error messages
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure blacklists and strict mode
   </Card>
 </CardGroup>

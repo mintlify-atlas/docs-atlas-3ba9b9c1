@@ -77,7 +77,7 @@ To verify the package is installed correctly, check if the validation rule is av
 
 ```php
 use Illuminate\Support\Facades\Validator;
-use Veeqtoh\ActiveEmail\Rules\NotBlackListedEmail;
+use Veeqtoh\ActiveEmail\Rules\NotBlacklistedEmail;
 
 // Method 1: String-based validator
 $validator = Validator::make(
@@ -88,7 +88,7 @@ $validator = Validator::make(
 // Method 2: Class-based validator
 $validator = Validator::make(
     ['email' => 'test@mailinator.com'],
-    ['email' => ['email', new NotBlackListedEmail()]]
+    ['email' => ['email', new NotBlacklistedEmail()]]
 );
 
 if ($validator->fails()) {
@@ -157,7 +157,7 @@ If you encounter issues after installation:
     Learn how to use the validation rule
   </Card>
   
-  <Card title="Configuration" icon="gear" href="/configuration">
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
     Customize lists and error messages
   </Card>
 </CardGroup>
